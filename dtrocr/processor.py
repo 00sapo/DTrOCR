@@ -65,7 +65,6 @@ class DTrOCRProcessor:
         )
         image_inputs = self.vit_processor(
             image,
-            input_data_format=input_data_format,
             return_tensors="pt",
         )
         return DTrOCRProcessorOutput(
@@ -119,7 +118,7 @@ class DTrOCRProcessor:
         ) if texts is not None else None
 
         image_inputs = self.vit_processor(
-            images, input_data_format=input_data_format, *args, **kwargs
+            images, *args, **kwargs
         ) if images is not None else None
 
         return DTrOCRProcessorOutput(
