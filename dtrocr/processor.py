@@ -31,6 +31,61 @@ class DTrOCRProcessor:
             self.tokeniser
         )
 
+    def encode_sample(
+        self,
+        image: Image.Image,
+        text: str,
+        max_target_length: int,
+        input_data_format: str = 'channels_last',
+    ) -> DTrOCRProcessorOutput:
+        text_inputs = self.tokeniser(
+            text,
+            padding="max_length",
+            max_length=max_target_length,
+            truncation=True,
+            return_tensors="pt",
+        )
+        image_inputs = self.vit_processor(
+            image,
+            input_data_format=input_data_format,
+            return_tensors="pt",
+        )
+        return DTrOCRProcessorOutput(
+            pixel_values=image_inputs["pixel_values"].squeeze(0),
+            input_ids=text_inputs["input_ids"].squeeze(0),
+            attention_mask=text_inputs["attention_mask"].squeeze(0),
+            labels=text_inputs["input_ids"].squeeze(0),
+        )
+
+    def build_generation_inputs(
+        self,
+        pixel_values,
+        input_ids=None,
+        attention_mask=None,
+    ) -> DTrOCRProcessorOutput:
+        import torch
+
+        bos_token_id = self.tokeniser.bos_token_id
+        if bos_token_id is None:
+            bos_token_id = self.tokeniser.eos_token_id
+        if bos_token_id is None:
+            bos_token_id = self.tokeniser.pad_token_id
+
+        batch_size = pixel_values.shape[0]
+        device = pixel_values.device
+        dtype = input_ids.dtype if input_ids is not None else torch.long
+        if input_ids is None:
+            input_ids = torch.full((batch_size, 1), bos_token_id, dtype=dtype, device=device)
+        if attention_mask is None:
+            attention_mask = torch.ones((batch_size, 1), dtype=torch.long, device=device)
+
+        return DTrOCRProcessorOutput(
+            pixel_values=pixel_values,
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            labels=None,
+        )
+
     def __call__(
         self,
         images: Union[Image.Image, List[Image.Image]] = None,

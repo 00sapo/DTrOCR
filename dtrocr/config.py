@@ -1,3 +1,4 @@
+import inspect
 from typing import Optional, Union, Tuple, List, Literal
 
 
@@ -34,7 +35,13 @@ class DTrOCRConfig:
         self.embd_pdrop = embd_pdrop
         self.attn_pdrop = attn_pdrop
         self.layer_norm_epsilon = layer_norm_epsilon
+        self.attn_implementation = attn_implementation
         self._attn_implementation = attn_implementation
+        self.is_decoder = True
+        self.is_encoder_decoder = False
+        self.use_cache = True
+        self.return_dict = True
+        self._experts_implementation = None
 
         # other GPT2 config values
         self.n_inner = None
@@ -43,3 +50,27 @@ class DTrOCRConfig:
         self.reorder_and_upcast_attn = False
         self.add_cross_attention = False
         self.activation_function = "gelu_new"
+
+    def to_dict(self) -> dict:
+        payload = {}
+        for key, value in self.__dict__.items():
+            if key == "_attn_implementation":
+                payload["attn_implementation"] = value
+            elif not key.startswith("_"):
+                payload[key] = value
+        if "attn_implementation" not in payload:
+            payload["attn_implementation"] = getattr(self, "attn_implementation", getattr(self, "_attn_implementation", None))
+        return payload
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "DTrOCRConfig":
+        if payload is None:
+            return cls()
+        init_params = inspect.signature(cls.__init__).parameters
+        filtered = {key: payload[key] for key in init_params if key != "self" and key in payload}
+        if "attn_implementation" not in filtered and "_attn_implementation" in payload:
+            filtered["attn_implementation"] = payload["_attn_implementation"]
+        return cls(**filtered)
+
+    def _get_generation_parameters(self) -> dict:
+        return {}
