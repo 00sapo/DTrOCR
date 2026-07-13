@@ -6,25 +6,43 @@ from config import DTrOCRConfig
 from data import DTrOCRProcessorOutput
 
 
+def _get_output_value(output, key):
+    if isinstance(output, dict):
+        return output[key]
+    return getattr(output, key)
+
+
 class DTrOCRProcessor:
-    def __init__(self, config: DTrOCRConfig, add_bos_token: bool = False, add_eos_token: bool = False):
-        self.vit_processor = AutoImageProcessor.from_pretrained(
-            config.vit_hf_model,
-            size={
-                "height": config.image_size[0],
-                'width': config.image_size[1]
-            },
-            use_fast=True
-        )
-        self.tokeniser = GPT2Tokenizer.from_pretrained(
-            config.gpt2_hf_model,
-            add_bos_token=add_bos_token,
-            model_max_length=config.max_position_embeddings - int(
-                (config.image_size[0] / config.patch_size[0]) * (config.image_size[1] / config.patch_size[1])
+    def __init__(
+        self,
+        config: DTrOCRConfig,
+        add_bos_token: bool = False,
+        add_eos_token: bool = False,
+        vit_processor=None,
+        tokeniser=None,
+    ):
+        if vit_processor is None:
+            vit_processor = AutoImageProcessor.from_pretrained(
+                config.vit_hf_model,
+                size={
+                    "height": config.image_size[0],
+                    'width': config.image_size[1]
+                },
+                use_fast=True
             )
-        )
-        self.tokeniser.pad_token = self.tokeniser.bos_token
-        self.tokeniser.add_eos_token = add_eos_token
+        if tokeniser is None:
+            tokeniser = GPT2Tokenizer.from_pretrained(
+                config.gpt2_hf_model,
+                add_bos_token=add_bos_token,
+                model_max_length=config.max_position_embeddings - int(
+                    (config.image_size[0] / config.patch_size[0]) * (config.image_size[1] / config.patch_size[1])
+                )
+            )
+            tokeniser.pad_token = tokeniser.bos_token
+            tokeniser.add_eos_token = add_eos_token
+
+        self.vit_processor = vit_processor
+        self.tokeniser = tokeniser
 
         # Bind a new method to gpt2_tokeniser
         self.tokeniser.build_inputs_with_special_tokens = modified_build_inputs_with_special_tokens.__get__(
@@ -51,10 +69,10 @@ class DTrOCRProcessor:
             return_tensors="pt",
         )
         return DTrOCRProcessorOutput(
-            pixel_values=image_inputs["pixel_values"].squeeze(0),
-            input_ids=text_inputs["input_ids"].squeeze(0),
-            attention_mask=text_inputs["attention_mask"].squeeze(0),
-            labels=text_inputs["input_ids"].squeeze(0),
+            pixel_values=_get_output_value(image_inputs, "pixel_values").squeeze(0),
+            input_ids=_get_output_value(text_inputs, "input_ids").squeeze(0),
+            attention_mask=_get_output_value(text_inputs, "attention_mask").squeeze(0),
+            labels=_get_output_value(text_inputs, "input_ids").squeeze(0),
         )
 
     def build_generation_inputs(
@@ -105,10 +123,10 @@ class DTrOCRProcessor:
         ) if images is not None else None
 
         return DTrOCRProcessorOutput(
-            pixel_values=image_inputs["pixel_values"] if images is not None else None,
-            input_ids=text_inputs['input_ids'] if texts is not None else None,
-            attention_mask=text_inputs['attention_mask'] if texts is not None else None,
-            labels=text_inputs['input_ids'] if texts is not None and return_labels else None
+            pixel_values=_get_output_value(image_inputs, "pixel_values") if images is not None else None,
+            input_ids=_get_output_value(text_inputs, 'input_ids') if texts is not None else None,
+            attention_mask=_get_output_value(text_inputs, 'attention_mask') if texts is not None else None,
+            labels=_get_output_value(text_inputs, 'input_ids') if texts is not None and return_labels else None
         )
 
 

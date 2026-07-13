@@ -74,3 +74,6 @@ class DTrOCRConfig:
 
     def _get_generation_parameters(self) -> dict:
         return {}
+
+    def get_text_config(self):
+        return self
